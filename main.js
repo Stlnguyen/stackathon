@@ -7,28 +7,31 @@ var explosionRate = 4000;
 var nextExplosion = 0;
 var missles;
 var invaderGroup;
+var wormInvaderGroup;
 var explosionGroup;
 var nextFire = 0;
 var MAX_INVADERS = 10;
+var wormSpawnPosition = 300;
+var nextWorm = 0;
+var wormSpawnRate = 5000;
 var lives;
 var score;
 var scoreText;
 var loseText;
 var resetText;
-
-
-    
-var spaceBackground;
+var innerWormSpawnRate = 1000;
+var nextInnerWorm = 0, spaceBackground;
 
 var mainState ={
     preload: function () {
         game.load.image('spaceBackground', 'assets/starfield.jpg')
-        game.load.image('spaceship', 'assets/spaceship.jpg')
+        game.load.image('spaceship', 'assets/spaceship.png')
         game.load.image('missle', 'assets/bluemissle.png')
         game.load.image('invader', 'assets/invader.png')
         game.load.spritesheet('explosion', 'assets/explosion.png',128,128)
         game.load.audio('music', ['assets/audio/music.ogg','assets/audio/music.mp3']);
         game.load.spritesheet('playerexplosion', 'assets/playerexplosion.png',128,128)
+        game.load.image('worminvader', 'assets/yellowinvader.png')
     },
 
 
@@ -49,7 +52,7 @@ var mainState ={
         //Player
         player = this.add.sprite(300,300,'spaceship')
         player.anchor.setTo(0.5,0.5)
-        player.scale.setTo(0.12,0.12);
+        player.scale.setTo(0.08,0.08);
         this.physics.arcade.enable(player);
         player.enableBody = true;
         player.body.collideWorldBounds = true;
@@ -78,7 +81,9 @@ var mainState ={
         missles.setAll('scale.y', 0.02);
 
         //Invaders
+        wormInvaderGroup = this.game.add.group();
         invaderGroup = this.game.add.group();
+        //game.add.existing(new WormInvader(game,game.width/2,game.height-200));
         //game.add.existing(new Invader(game,game.width/2,game.height-16))
 
         //Explosions
@@ -102,6 +107,25 @@ var mainState ={
     update: function () {
         if (lives>0)
         {
+            if (game.time.now > nextWorm) {
+                nextWorm = game.time.now + wormSpawnRate;
+                wormSpawnPosition = Math.random() * 450 + 75;
+            }
+            if (game.time.now > nextInnerWorm){
+                nextInnerWorm = game.time.now + innerWormSpawnRate;
+                
+                spawnWormInvaders(wormSpawnPosition, game.height+50);
+            }
+
+            wormInvaderGroup.forEachAlive(function(m){
+                var distance = game.math.distance(m.x, m.y,
+                    player.x, player.y);
+                if (distance < 50) {
+                    lives = 0;
+                    livesText.text = 'Lives: ' + lives;
+                }
+            })
+
             if (invaderGroup.countLiving() < MAX_INVADERS) {
                 // Set the launch point to a random location below the bottom edge
                 // of the stage
@@ -126,6 +150,8 @@ var mainState ={
                 }
             });
 
+           
+
             invaderGroup.forEachAlive(function(i) {
                 missles.forEachAlive(function(m){
                     var distance = game.math.distance(m.x,m.y,i.x,i.y)
@@ -145,16 +171,16 @@ var mainState ={
                 
             }
             if(controls.up.isDown){
-                player.body.velocity.y -= playerSpeed
+                player.y -= playerSpeed
             // player.body.acceleration.y -= 1;
             } if (controls.right.isDown){
-                player.body.velocity.x += playerSpeed
+                player.x += playerSpeed
                 //player.body.acceleration.x -= 1;
             } if (controls.left.isDown){
-                player.body.velocity.x -= playerSpeed
+                player.x -= playerSpeed
             // player.body.acceleration.x += 1;
             } if (controls.down.isDown){
-                player.body.velocity.y += playerSpeed
+                player.y += playerSpeed
             // player.body.acceleration.y += 1;
             } if (controls.explosion.isDown && game.time.now > nextExplosion){
                 nextExplosion = game.time.now + explosionRate;
@@ -173,7 +199,8 @@ var mainState ={
                         player.x, player.y);
                     if (distance < 130) {
                         m.kill();
-                        score+= 1000;
+                        score+= 2000;
+                        scoreText.text = 'Score: ' + score;
                         getExplosion(m.x, m.y);
                     }
                 });
@@ -233,6 +260,26 @@ function spawnInvaders (x,y){
     return invader;
 }
 
+function spawnWormInvaders (x,y){
+    var wormInvader = wormInvaderGroup.getFirstDead();
+    // If there aren't any available, create a new one
+    if (wormInvader === null) {
+        wormInvader = new WormInvader(this.game);
+        this.wormInvaderGroup.add(wormInvader);
+    }
+
+    // Revive the wormInvader (set it's alive property to true)
+    // You can also define a onRevived event handler in your explosion objects
+    // to do stuff when they are revived.
+    wormInvader.revive();
+
+    // Move the wormInvader to the given coordinates
+    wormInvader.x = x;
+    wormInvader.y = y;
+
+    return wormInvader;
+}
+
 function getExplosion (x,y){
     var explosion = explosionGroup.getFirstDead();
     
@@ -242,7 +289,7 @@ function getExplosion (x,y){
             explosion.anchor.setTo(0.5, 0.5);
             //explosion.scale.setTo(0.5,0.5);
     
-            var animation = explosion.animations.add('boom', [0,1,2,3,4,5,6,7,8], 60, false);
+            var animation = explosion.animations.add('boom', [0,1,2,3,4,5,6,7,8], 30, false);
             animation.killOnComplete = true;
 
             // Add the explosion sprite to the group
@@ -293,13 +340,22 @@ var Invader = function (game,x,y){
     
 }
 
+var WormInvader = function(game,x,y){
+    Phaser.Sprite.call(this, game, x, y, 'worminvader');
+    this.anchor.setTo(0.5,0.5);
+    this.scale.setTo(0.07,0.07);
+
+    this.game.physics.enable(this, Phaser.Physics.ARCADE);
+
+    this.SPEED = 100; // Invader speed pixels/second
+}
+
 Invader.prototype = Object.create(Phaser.Sprite.prototype);
 Invader.prototype.constructor = Invader;
 
 Invader.prototype.update = function() {
     // Calculate the angle from the Invader to the mouse cursor game.input.x
-    // and game.input.y are the mouse position; substitute with whatever
-    // target coordinates you need.
+    // and game.input.y are the mouse position
     var targetAngle = this.game.math.angleBetween(
         this.x, this.y,
         player.x, player.y
@@ -333,6 +389,17 @@ Invader.prototype.update = function() {
     // Calculate velocity vector based on this.rotation and this.SPEED
     this.body.velocity.x = Math.cos(this.rotation) * this.SPEED;
     this.body.velocity.y = Math.sin(this.rotation) * this.SPEED;
+};
+
+
+WormInvader.prototype = Object.create(Phaser.Sprite.prototype);
+WormInvader.prototype.constructor = WormInvader
+WormInvader.prototype.update = function() {
+    // Calculate the angle from the Invader to the mouse cursor game.input.x
+    // and game.input.y are the mouse position
+    // Calculate the angle from the Invader to the mouse cursor game.input.x
+    // and game.input.y are the mouse position
+    this.y -= 0.7
 };
 
 
