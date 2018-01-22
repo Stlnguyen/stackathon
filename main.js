@@ -1,26 +1,12 @@
 var game = new Phaser.Game(600,600,Phaser.CANVAS,'gameDiv')
-var player;
+var player, playerSpeed = 3;
 var controls = {};
-var playerSpeed = 3;
-var fireRate = 100;
-var explosionRate = 4000;
-var nextExplosion = 0;
-var missles;
-var invaderGroup;
-var wormInvaderGroup;
-var explosionGroup;
-var nextFire = 0;
-var MAX_INVADERS = 10;
-var wormSpawnPosition = 300;
-var nextWorm = 0;
-var wormSpawnRate = 5000;
-var lives;
-var score;
-var scoreText;
-var loseText;
-var resetText;
-var innerWormSpawnRate = 1000;
-var nextInnerWorm = 0, spaceBackground;
+var fireRate = 100, nextFire = 0,missles;
+var explosionRate = 4000, nextExplosion = 0,explosionGroup;
+var invaderGroup, MAX_INVADERS = 10;
+var wormInvaderGroup, wormSpawnPosition = 300, nextWorm = 0, wormSpawnRate = 5000, innerWormSpawnRate = 1000, nextInnerWorm = 0;
+var lives, score, scoreText, loseText, resetText;
+var spaceBackground;
 
 var mainState ={
     preload: function () {
@@ -29,7 +15,7 @@ var mainState ={
         game.load.image('missle', 'assets/bluemissle.png')
         game.load.image('invader', 'assets/invader.png')
         game.load.spritesheet('explosion', 'assets/explosion.png',128,128)
-        game.load.audio('music', ['assets/audio/music.ogg','assets/audio/music.mp3']);
+       // game.load.audio('music', ['assets/audio/music.ogg','assets/audio/music.mp3']);
         game.load.spritesheet('playerexplosion', 'assets/playerexplosion.png',128,128)
         game.load.image('worminvader', 'assets/yellowinvader.png')
     },
@@ -37,12 +23,12 @@ var mainState ={
 
 
     create: function () {
-        
+        //Initialize the game
         game.physics.startSystem(Phaser.Physics.ARCADE);   
         game.physics.setBoundsToWorld(); 
+
         //Background
         spaceBackground = game.add.tileSprite(0,0,600,600,'spaceBackground')
-        //game.stage.backgroundColor = '#313131'
 
         //Music
        // music = game.add.audio('musical');
@@ -58,6 +44,7 @@ var mainState ={
         player.body.collideWorldBounds = true;
         lives = 5;
 
+        //Controls
         controls = {
             explosion: this.input.keyboard.addKey(Phaser.Keyboard.Q),
             restart: this.input.keyboard.addKey(Phaser.Keyboard.R),
@@ -89,7 +76,7 @@ var mainState ={
         //Explosions
         explosionGroup = this.game.add.group();
 
-        //Score
+        //Text
         score = 0;
         scoreText = game.add.text(16, 16, 'Score: 0', { fontSize: '16px', fill: '#FFF' });
 
@@ -107,16 +94,19 @@ var mainState ={
     update: function () {
         if (lives>0)
         {
+            //Randomly change the worm location for spawning
             if (game.time.now > nextWorm) {
                 nextWorm = game.time.now + wormSpawnRate;
                 wormSpawnPosition = Math.random() * 450 + 75;
             }
+            //Spawn worm invaders
             if (game.time.now > nextInnerWorm){
                 nextInnerWorm = game.time.now + innerWormSpawnRate;
                 
                 spawnWormInvaders(wormSpawnPosition, game.height+50);
             }
 
+            //Check if player is too close to worm invader
             wormInvaderGroup.forEachAlive(function(m){
                 var distance = game.math.distance(m.x, m.y,
                     player.x, player.y);
@@ -126,9 +116,8 @@ var mainState ={
                 }
             })
 
+            //Randomly spawn invaders from all edges of world
             if (invaderGroup.countLiving() < MAX_INVADERS) {
-                // Set the launch point to a random location below the bottom edge
-                // of the stage
                 spawnInvaders(game.rnd.integerInRange(50, game.width-50),
                     game.height + 50);
                 spawnInvaders(game.rnd.integerInRange(50, game.width-50),
@@ -139,7 +128,7 @@ var mainState ={
                     game.rnd.integerInRange(50, game.height-50));
             }
 
-            //Check if invaders are close to player
+            //Check if invaders are hitting the player
             invaderGroup.forEachAlive(function(m) {
                 var distance = game.math.distance(m.x, m.y,
                     player.x, player.y);
@@ -151,7 +140,7 @@ var mainState ={
             });
 
            
-
+            //Check if missles are close to invaders, if so increase score and get rid of both
             invaderGroup.forEachAlive(function(i) {
                 missles.forEachAlive(function(m){
                     var distance = game.math.distance(m.x,m.y,i.x,i.y)
@@ -165,11 +154,14 @@ var mainState ={
                 })
             })
 
+            //Rotation for player towards where cursor is
             player.rotation = game.physics.arcade.angleToPointer(player);
             if (game.input.activePointer.isDown){
                 fire();
                 
             }
+
+            //Controls for player
             if(controls.up.isDown){
                 player.y -= playerSpeed
             // player.body.acceleration.y -= 1;
@@ -206,6 +198,7 @@ var mainState ={
                 });
             }
         }
+        //Lose text
         else {
             loseText.visible = true;
             resetText.visible = true;
@@ -217,6 +210,7 @@ var mainState ={
     }
 }
 
+//Handle missle firing
 function fire () {
     if (game.time.now > nextFire && missles.countDead() > 0)
     {
@@ -240,17 +234,14 @@ function fire () {
     }
 }
 
+//Spawn square invaders
 function spawnInvaders (x,y){
     var invader = invaderGroup.getFirstDead();
-    // If there aren't any available, create a new one
     if (invader === null) {
         invader = new Invader(this.game);
         this.invaderGroup.add(invader);
     }
-
-    // Revive the invader (set it's alive property to true)
-    // You can also define a onRevived event handler in your explosion objects
-    // to do stuff when they are revived.
+    
     invader.revive();
 
     // Move the invader to the given coordinates
@@ -260,48 +251,37 @@ function spawnInvaders (x,y){
     return invader;
 }
 
+//Spawn worm invaders
 function spawnWormInvaders (x,y){
     var wormInvader = wormInvaderGroup.getFirstDead();
-    // If there aren't any available, create a new one
     if (wormInvader === null) {
         wormInvader = new WormInvader(this.game);
         this.wormInvaderGroup.add(wormInvader);
     }
 
-    // Revive the wormInvader (set it's alive property to true)
-    // You can also define a onRevived event handler in your explosion objects
-    // to do stuff when they are revived.
     wormInvader.revive();
 
-    // Move the wormInvader to the given coordinates
+    // Move the worm invader to the given coordinates
     wormInvader.x = x;
     wormInvader.y = y;
 
     return wormInvader;
 }
 
+//Deal with explosion sprite
 function getExplosion (x,y){
     var explosion = explosionGroup.getFirstDead();
-    
-        // If there aren't any available, create a new one
         if (explosion === null) {
             explosion = game.add.sprite(0, 0, 'explosion');
             explosion.anchor.setTo(0.5, 0.5);
-            //explosion.scale.setTo(0.5,0.5);
     
             var animation = explosion.animations.add('boom', [0,1,2,3,4,5,6,7,8], 30, false);
             animation.killOnComplete = true;
 
             // Add the explosion sprite to the group
-            explosionGroup.add(explosion);
-            
-            //explosion.lifespan = 200;
-            
+            explosionGroup.add(explosion);  
         }
-    
-        // Revive the explosion (set it's alive property to true)
-        // You can also define a onRevived event handler in your explosion objects
-        // to do stuff when they are revived.
+        
         explosion.revive();
     
         // Move the explosion to the given coordinates
@@ -317,6 +297,7 @@ function getExplosion (x,y){
         return explosion;
 }
 
+//Invader constructor
 var Invader = function (game,x,y){
     Phaser.Sprite.call(this, game, x, y, 'invader');
     this.anchor.setTo(0.5,0.5);
@@ -340,6 +321,7 @@ var Invader = function (game,x,y){
     
 }
 
+//Worm invader constructor
 var WormInvader = function(game,x,y){
     Phaser.Sprite.call(this, game, x, y, 'worminvader');
     this.anchor.setTo(0.5,0.5);
